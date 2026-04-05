@@ -8,7 +8,7 @@ import (
 	rediskeys "dispatch-socket-service/internal/redis"
 	"dispatch-socket-service/internal/utils"
 
-	"github.com/go-redis/redis/v9"
+	"github.com/redis/go-redis/v9"
 )
 
 type PresenceService struct {

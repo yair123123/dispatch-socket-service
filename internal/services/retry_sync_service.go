@@ -10,7 +10,7 @@ import (
 	"dispatch-socket-service/internal/models"
 	rediskeys "dispatch-socket-service/internal/redis"
 
-	"github.com/go-redis/redis/v9"
+	"github.com/redis/go-redis/v9"
 )
 
 type RetrySyncService struct {

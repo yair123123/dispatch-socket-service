@@ -11,7 +11,7 @@ import (
 	"dispatch-socket-service/internal/services"
 	"dispatch-socket-service/internal/ws"
 
-	"github.com/go-redis/redis/v9"
+	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/require"
 )
 
