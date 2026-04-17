@@ -7,6 +7,7 @@ import (
 	"dispatch-socket-service/internal/auth"
 	"dispatch-socket-service/internal/clients"
 	"dispatch-socket-service/internal/config"
+	"dispatch-socket-service/internal/geo"
 	httpserver "dispatch-socket-service/internal/http"
 	"dispatch-socket-service/internal/http/handlers"
 	"dispatch-socket-service/internal/services"
@@ -33,13 +34,14 @@ func main() {
 	}
 	cm := ws.NewConnectionManager()
 	presence := services.NewPresenceService(rdb, cfg.DriverStateTTL)
-	location := services.NewLocationService(rdb, cfg.DriverStateTTL, cfg.DriverLocationTTL)
+	h3Indexer := geo.NewH3Indexer()
+	location := services.NewLocationService(rdb, cfg.DriverStateTTL, cfg.DriverLocationTTL, cfg.DriverH3Resolution, h3Indexer)
 	coreClient := clients.NewCoreClient(cfg.CoreServiceBaseURL, cfg.InternalServiceSecret, cfg.CoreServiceTimeout)
 	retrySync := services.NewRetrySyncService(rdb, coreClient, logger, cfg.CoreSyncRetryInterval, cfg.CoreSyncMaxRetries)
 	go retrySync.Start(context.Background())
 	coreSync := services.NewCoreSyncService(coreClient, retrySync, logger)
 	offers := services.NewOfferDeliveryService(rdb, cm, cfg.WSWriteTimeout)
-	rounds := services.NewDispatchRoundService(rdb, offers, coreClient, logger, cfg.CoreCallbackMaxRetries, cfg.CoreCallbackBackoff)
+	rounds := services.NewDispatchRoundService(rdb, offers, coreClient, logger, cfg.CoreCallbackMaxRetries, cfg.CoreCallbackBackoff, cfg.DriverH3Resolution, h3Indexer)
 	accept := services.NewRideAcceptanceService(rdb, cm, offers, coreSync, rounds, cfg.WSWriteTimeout, logger)
 	router := ws.NewMessageRouter(presence, location, accept, logger)
 	wsHandler := ws.NewDriverWSHandler(authenticator, cm, presence, router, cfg.WSPingInterval, cfg.WSReadTimeout, cfg.WSWriteTimeout, logger)

@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sort"
 	"strconv"
 	"time"
 
 	"dispatch-socket-service/internal/clients"
+	"dispatch-socket-service/internal/geo"
 	"dispatch-socket-service/internal/models"
 	rediskeys "dispatch-socket-service/internal/redis"
 
@@ -21,9 +23,11 @@ type DispatchRoundService struct {
 	logger             *slog.Logger
 	callbackMaxRetries int
 	callbackBackoff    time.Duration
+	defaultResolution  int
+	h3Indexer          *geo.H3Indexer
 }
 
-func NewDispatchRoundService(rdb redis.UniversalClient, offers *OfferDeliveryService, coreClient clients.CoreClient, logger *slog.Logger, callbackMaxRetries int, callbackBackoff time.Duration) *DispatchRoundService {
+func NewDispatchRoundService(rdb redis.UniversalClient, offers *OfferDeliveryService, coreClient clients.CoreClient, logger *slog.Logger, callbackMaxRetries int, callbackBackoff time.Duration, defaultResolution int, h3Indexer *geo.H3Indexer) *DispatchRoundService {
 	return &DispatchRoundService{
 		rdb:                rdb,
 		offers:             offers,
@@ -31,10 +35,17 @@ func NewDispatchRoundService(rdb redis.UniversalClient, offers *OfferDeliverySer
 		logger:             logger,
 		callbackMaxRetries: callbackMaxRetries,
 		callbackBackoff:    callbackBackoff,
+		defaultResolution:  defaultResolution,
+		h3Indexer:          h3Indexer,
 	}
 }
 
 func (s *DispatchRoundService) StartRound(ctx context.Context, req models.StartDispatchRoundRequest) {
+	if req.H3Resolution != s.defaultResolution {
+		s.logger.Warn("unsupported round resolution", "round_id", req.RoundID, "requested", req.H3Resolution, "expected", s.defaultResolution)
+		s.reportRoundResultWithRetry(context.Background(), models.DispatchRoundResultRequest{RideID: req.RideID, RoundID: req.RoundID, RoundNumber: req.RoundNumber, Status: "no_candidates"})
+		return
+	}
 	candidates, err := s.findCandidates(ctx, req)
 	if err != nil {
 		s.logger.Error("dispatch candidate lookup failed", "round_id", req.RoundID, "error", err)
@@ -121,29 +132,44 @@ func (s *DispatchRoundService) reportRoundResultWithRetry(ctx context.Context, r
 }
 
 func (s *DispatchRoundService) findCandidates(ctx context.Context, req models.StartDispatchRoundRequest) ([]string, error) {
-	results, err := s.rdb.GeoRadius(ctx, rediskeys.DriversLocationsKey, req.OriginLon, req.OriginLat, &redis.GeoRadiusQuery{
-		Radius: req.RadiusKm,
-		Unit:   "km",
-		Sort:   "ASC",
-		Count:  req.MaxCandidates * 3,
-	}).Result()
+	originCell, err := s.h3Indexer.CellFromLatLon(req.OriginLat, req.OriginLon, req.H3Resolution)
 	if err != nil {
 		return nil, err
 	}
+	layers, err := s.h3Indexer.CellsByRing(originCell, req.RingSize)
+	if err != nil {
+		return nil, err
+	}
+	seen := make(map[string]struct{})
 	candidates := make([]string, 0, req.MaxCandidates)
-	for _, result := range results {
-		if len(candidates) >= req.MaxCandidates {
-			break
+
+	for ring := 0; ring <= req.RingSize; ring++ {
+		cells := layers[ring]
+		sort.Strings(cells)
+		for _, cell := range cells {
+			driverIDs, err := s.rdb.SMembers(ctx, rediskeys.H3CellDriversKey(cell)).Result()
+			if err != nil && err != redis.Nil {
+				return nil, err
+			}
+			sort.Strings(driverIDs)
+			for _, driverID := range driverIDs {
+				if _, exists := seen[driverID]; exists {
+					continue
+				}
+				state, err := s.rdb.HGetAll(ctx, rediskeys.DriverStateKey(driverID)).Result()
+				if err != nil {
+					return nil, err
+				}
+				if state["is_online"] != "true" || state["is_available"] != "true" {
+					continue
+				}
+				seen[driverID] = struct{}{}
+				candidates = append(candidates, driverID)
+				if len(candidates) >= req.MaxCandidates {
+					return candidates, nil
+				}
+			}
 		}
-		driverID := result.Name
-		state, err := s.rdb.HGetAll(ctx, rediskeys.DriverStateKey(driverID)).Result()
-		if err != nil {
-			return nil, err
-		}
-		if state["is_online"] != "true" || state["is_available"] != "true" {
-			continue
-		}
-		candidates = append(candidates, driverID)
 	}
 	return candidates, nil
 }

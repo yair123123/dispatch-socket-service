@@ -14,7 +14,7 @@
 - Retries failed core sync jobs from a Redis-backed queue.
 
 ## What this service does NOT do
-- Does not decide dispatch radius, rounds, or candidate selection.
+- Does not decide dispatch radius/round policy or business-side candidate policy.
 - Does not create rides.
 - Does not persist location stream into PostgreSQL.
 - Does not own pricing/identity/telephony/geocoding/business rules.
@@ -48,8 +48,10 @@
 - `POST /internal/dispatch/start-round`
 
 ## Redis keys overview
-- `drivers:locations` (GEO)
+- `drivers:locations` (GEO legacy)
 - `driver:state:{driver_id}` (HASH)
+- `h3:cell:{cell_id}:drivers` (SET)
+- `driver:{driver_id}:h3_cell` (STRING)
 - `ride:{ride_id}:dispatch` (HASH)
 - `ride:{ride_id}:offer:{driver_id}` (HASH)
 - `ride:{ride_id}:winner` (STRING)
@@ -90,6 +92,7 @@
 - `REDIS_ACCEPT_LOCK_TTL_SECONDS`
 - `CORE_SYNC_RETRY_INTERVAL_SECONDS`
 - `CORE_SYNC_MAX_RETRIES`
+- `DRIVER_H3_RESOLUTION`
 
 ## Run locally
 ```bash
