@@ -34,18 +34,19 @@ func main() {
 	cm := ws.NewConnectionManager()
 	presence := services.NewPresenceService(rdb, cfg.DriverStateTTL)
 	location := services.NewLocationService(rdb, cfg.DriverStateTTL, cfg.DriverLocationTTL)
-	coreClient := clients.NewCoreClient(cfg.CoreServiceBaseURL, cfg.CoreServiceTimeout)
+	coreClient := clients.NewCoreClient(cfg.CoreServiceBaseURL, cfg.InternalServiceSecret, cfg.CoreServiceTimeout)
 	retrySync := services.NewRetrySyncService(rdb, coreClient, logger, cfg.CoreSyncRetryInterval, cfg.CoreSyncMaxRetries)
 	go retrySync.Start(context.Background())
 	coreSync := services.NewCoreSyncService(coreClient, retrySync, logger)
 	offers := services.NewOfferDeliveryService(rdb, cm, cfg.WSWriteTimeout)
-	accept := services.NewRideAcceptanceService(rdb, cm, offers, coreSync, cfg.WSWriteTimeout, logger)
+	rounds := services.NewDispatchRoundService(rdb, offers, coreClient, logger, cfg.CoreCallbackMaxRetries, cfg.CoreCallbackBackoff)
+	accept := services.NewRideAcceptanceService(rdb, cm, offers, coreSync, rounds, cfg.WSWriteTimeout, logger)
 	router := ws.NewMessageRouter(presence, location, accept, logger)
 	wsHandler := ws.NewDriverWSHandler(authenticator, cm, presence, router, cfg.WSPingInterval, cfg.WSReadTimeout, cfg.WSWriteTimeout, logger)
 
 	healthHandler := handlers.NewHealthHandler()
-	dispatchHandler := handlers.NewInternalDispatchHandler(offers)
-	server := httpserver.NewRouter(healthHandler, dispatchHandler, wsHandler)
+	dispatchHandler := handlers.NewInternalDispatchHandler(offers, rounds)
+	server := httpserver.NewRouter(healthHandler, dispatchHandler, wsHandler, cfg.InternalServiceSecret)
 	if err := server.Run(":" + cfg.AppPort); err != nil {
 		log.Fatal(err)
 	}

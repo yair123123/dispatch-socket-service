@@ -18,6 +18,7 @@ type RideAcceptanceService struct {
 	connections  DriverSender
 	offers       *OfferDeliveryService
 	coreSync     *CoreSyncService
+	dispatch     *DispatchRoundService
 	writeTimeout time.Duration
 	logger       *slog.Logger
 }
@@ -56,8 +57,8 @@ redis.call('HSET', offerKey, 'status', 'accepted', 'accepted_at_epoch', tostring
 return {'1', 'won'}
 `)
 
-func NewRideAcceptanceService(rdb redis.UniversalClient, cm DriverSender, offers *OfferDeliveryService, coreSync *CoreSyncService, writeTimeout time.Duration, logger *slog.Logger) *RideAcceptanceService {
-	return &RideAcceptanceService{rdb: rdb, connections: cm, offers: offers, coreSync: coreSync, writeTimeout: writeTimeout, logger: logger}
+func NewRideAcceptanceService(rdb redis.UniversalClient, cm DriverSender, offers *OfferDeliveryService, coreSync *CoreSyncService, dispatch *DispatchRoundService, writeTimeout time.Duration, logger *slog.Logger) *RideAcceptanceService {
+	return &RideAcceptanceService{rdb: rdb, connections: cm, offers: offers, coreSync: coreSync, dispatch: dispatch, writeTimeout: writeTimeout, logger: logger}
 }
 
 func (s *RideAcceptanceService) AcceptRide(ctx context.Context, driverID string, req models.AcceptRideRequest) (AcceptResult, error) {
@@ -91,7 +92,18 @@ func (s *RideAcceptanceService) AcceptRide(ctx context.Context, driverID string,
 	if err := s.offers.CancelOthers(ctx, req.RideID, req.OfferID, req.RoundNumber, driverID); err != nil {
 		s.logger.Error("cancel others failed", "ride_id", req.RideID, "error", err)
 	}
-	go s.coreSync.SyncAssignment(context.Background(), models.CoreAssignDriverRequest{RideID: req.RideID, DriverID: driverID, OfferID: req.OfferID, RoundNumber: req.RoundNumber})
+	dispatchMeta, metaErr := s.rdb.HMGet(ctx, rediskeys.RideDispatchKey(req.RideID), "round_id", "current_round").Result()
+	if metaErr == nil && len(dispatchMeta) == 2 && dispatchMeta[0] != nil {
+		roundID := fmt.Sprint(dispatchMeta[0])
+		if rideIDInt, err := ParseInt64(req.RideID); err == nil {
+			if winnerIDInt, err := ParseInt64(driverID); err == nil && s.dispatch != nil {
+				s.dispatch.ReportWinner(context.Background(), rideIDInt, roundID, req.RoundNumber, winnerIDInt)
+			}
+		}
+	}
+	if s.coreSync != nil {
+		go s.coreSync.SyncAssignment(context.Background(), models.CoreAssignDriverRequest{RideID: req.RideID, DriverID: driverID, OfferID: req.OfferID, RoundNumber: req.RoundNumber})
+	}
 	return AcceptResult{Success: true, Reason: "won"}, nil
 }
 

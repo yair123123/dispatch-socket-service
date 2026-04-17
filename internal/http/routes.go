@@ -7,12 +7,17 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func NewRouter(health *handlers.HealthHandler, dispatch *handlers.InternalDispatchHandler, wsHandler *ws.DriverWSHandler) *gin.Engine {
+func NewRouter(health *handlers.HealthHandler, dispatch *handlers.InternalDispatchHandler, wsHandler *ws.DriverWSHandler, internalSecret string) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.GET("/health", health.Get)
-	r.POST("/internal/dispatch/offer", dispatch.SendOffer)
-	r.POST("/internal/dispatch/cancel", dispatch.CancelOffer)
-	r.GET("/ws/drivers/connect", gin.WrapH(wsHandler))
+	internal := r.Group("/internal")
+	internal.Use(InternalAuthMiddleware(internalSecret))
+	internal.POST("/dispatch/offer", dispatch.SendOffer)
+	internal.POST("/dispatch/cancel", dispatch.CancelOffer)
+	internal.POST("/dispatch/start-round", dispatch.StartRound)
+	if wsHandler != nil {
+		r.GET("/ws/drivers/connect", gin.WrapH(wsHandler))
+	}
 	return r
 }
