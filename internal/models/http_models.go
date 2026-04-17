@@ -1,6 +1,7 @@
 package models
 
 type SendOfferRequest struct {
+	RoundID     string      `json:"round_id,omitempty"`
 	RideID      string      `json:"ride_id" binding:"required"`
 	RoundNumber int         `json:"round_number" binding:"required"`
 	ExpiresAt   string      `json:"expires_at" binding:"required"`
@@ -36,4 +37,37 @@ type CoreAssignDriverRequest struct {
 	DriverID    string `json:"driver_id"`
 	OfferID     string `json:"offer_id"`
 	RoundNumber int    `json:"round_number"`
+}
+
+type StartDispatchRoundRequest struct {
+	RideID         int64           `json:"rideId" binding:"required"`
+	RoundID        string          `json:"roundId" binding:"required"`
+	RoundNumber    int             `json:"roundNumber" binding:"required"`
+	StationID      int64           `json:"stationId"`
+	OriginLat      float64         `json:"originLat" binding:"required"`
+	OriginLon      float64         `json:"originLon" binding:"required"`
+	RadiusKm       float64         `json:"radiusKm" binding:"required"`
+	TimeoutSeconds int             `json:"timeoutSeconds" binding:"required,min=1"`
+	MaxCandidates  int             `json:"maxCandidates" binding:"required,min=1"`
+	RidePreview    DispatchPreview `json:"ridePreview" binding:"required"`
+}
+
+type DispatchPreview struct {
+	OriginText      string  `json:"originText"`
+	DestinationText string  `json:"destinationText"`
+	Price           float64 `json:"price"`
+	Note            string  `json:"note"`
+}
+
+type StartDispatchRoundResponse struct {
+	Accepted bool   `json:"accepted"`
+	RoundID  string `json:"roundId"`
+}
+
+type DispatchRoundResultRequest struct {
+	RideID         int64  `json:"rideId"`
+	RoundID        string `json:"roundId"`
+	RoundNumber    int    `json:"roundNumber"`
+	Status         string `json:"status"`
+	WinnerDriverID *int64 `json:"winnerDriverId,omitempty"`
 }

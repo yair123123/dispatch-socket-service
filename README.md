@@ -45,6 +45,7 @@
 - `GET /health`
 - `POST /internal/dispatch/offer`
 - `POST /internal/dispatch/cancel`
+- `POST /internal/dispatch/start-round`
 
 ## Redis keys overview
 - `drivers:locations` (GEO)
@@ -77,7 +78,10 @@
 - `JWT_SECRET` or `JWT_PUBLIC_KEY`
 - `REDIS_URL`
 - `CORE_SERVICE_BASE_URL`
+- `INTERNAL_SERVICE_SECRET`
 - `CORE_SERVICE_TIMEOUT_SECONDS`
+- `CORE_CALLBACK_MAX_RETRIES`
+- `CORE_CALLBACK_BACKOFF_SECONDS`
 - `WS_PING_INTERVAL_SECONDS`
 - `WS_READ_TIMEOUT_SECONDS`
 - `WS_WRITE_TIMEOUT_SECONDS`

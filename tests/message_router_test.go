@@ -24,7 +24,8 @@ func TestWebSocketMessageRoutingBasic(t *testing.T) {
 	retry := services.NewRetrySyncService(rdb, core, slog.Default(), time.Second, 2)
 	sync := services.NewCoreSyncService(core, retry, slog.Default())
 	offers := services.NewOfferDeliveryService(rdb, cm, time.Second)
-	accept := services.NewRideAcceptanceService(rdb, cm, offers, sync, time.Second, slog.Default())
+	rounds := services.NewDispatchRoundService(rdb, offers, core, slog.Default(), 2, 10*time.Millisecond)
+	accept := services.NewRideAcceptanceService(rdb, cm, offers, sync, rounds, time.Second, slog.Default())
 	router := ws.NewMessageRouter(presence, location, accept, slog.Default())
 
 	err := router.Route(context.Background(), "driver_1", []byte(`{"type":"set_availability","payload":{"is_available":true}}`))

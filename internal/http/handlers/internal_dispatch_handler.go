@@ -11,10 +11,11 @@ import (
 
 type InternalDispatchHandler struct {
 	offers *services.OfferDeliveryService
+	rounds *services.DispatchRoundService
 }
 
-func NewInternalDispatchHandler(offers *services.OfferDeliveryService) *InternalDispatchHandler {
-	return &InternalDispatchHandler{offers: offers}
+func NewInternalDispatchHandler(offers *services.OfferDeliveryService, rounds *services.DispatchRoundService) *InternalDispatchHandler {
+	return &InternalDispatchHandler{offers: offers, rounds: rounds}
 }
 
 func (h *InternalDispatchHandler) SendOffer(c *gin.Context) {
@@ -42,4 +43,17 @@ func (h *InternalDispatchHandler) CancelOffer(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+func (h *InternalDispatchHandler) StartRound(c *gin.Context) {
+	var req models.StartDispatchRoundRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	go h.rounds.StartRound(c.Request.Context(), req)
+	c.JSON(http.StatusAccepted, models.StartDispatchRoundResponse{
+		Accepted: true,
+		RoundID:  req.RoundID,
+	})
 }

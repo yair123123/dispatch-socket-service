@@ -14,3 +14,6 @@ func RideWinnerKey(rideID string) string { return fmt.Sprintf("ride:%s:winner", 
 func RideRoundDriversKey(rideID string, roundNumber int) string {
 	return fmt.Sprintf("ride:%s:round:%d:drivers", rideID, roundNumber)
 }
+func RoundResultSentKey(roundID string) string {
+	return fmt.Sprintf("dispatch:round:%s:result_sent", roundID)
+}

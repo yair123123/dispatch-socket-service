@@ -30,6 +30,7 @@ func (s *OfferDeliveryService) DeliverOfferBatch(ctx context.Context, req models
 	dispatchKey := rediskeys.RideDispatchKey(req.RideID)
 	if err := s.rdb.HSet(ctx, dispatchKey, map[string]interface{}{
 		"ride_id":          req.RideID,
+		"round_id":         req.RoundID,
 		"status":           "open",
 		"current_round":    req.RoundNumber,
 		"expires_at":       req.ExpiresAt,
