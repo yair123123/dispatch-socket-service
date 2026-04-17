@@ -46,9 +46,10 @@ type StartDispatchRoundRequest struct {
 	StationID      int64           `json:"stationId"`
 	OriginLat      float64         `json:"originLat" binding:"required"`
 	OriginLon      float64         `json:"originLon" binding:"required"`
-	RadiusKm       float64         `json:"radiusKm" binding:"required"`
 	TimeoutSeconds int             `json:"timeoutSeconds" binding:"required,min=1"`
 	MaxCandidates  int             `json:"maxCandidates" binding:"required,min=1"`
+	H3Resolution   int             `json:"h3Resolution" binding:"required,min=0,max=15"`
+	RingSize       int             `json:"ringSize" binding:"required,min=0"`
 	RidePreview    DispatchPreview `json:"ridePreview" binding:"required"`
 }
 

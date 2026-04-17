@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"dispatch-socket-service/internal/geo"
 	"dispatch-socket-service/internal/models"
 	rediskeys "dispatch-socket-service/internal/redis"
 	"dispatch-socket-service/internal/services"
@@ -17,14 +18,15 @@ import (
 func TestWebSocketMessageRoutingBasic(t *testing.T) {
 	rdb, done := setupRedis(t)
 	defer done()
+	h3 := geo.NewH3Indexer()
 	presence := services.NewPresenceService(rdb, time.Minute)
-	location := services.NewLocationService(rdb, time.Minute, time.Minute)
+	location := services.NewLocationService(rdb, time.Minute, time.Minute, 9, h3)
 	cm := ws.NewConnectionManager()
 	core := &fakeCoreClient{}
 	retry := services.NewRetrySyncService(rdb, core, slog.Default(), time.Second, 2)
 	sync := services.NewCoreSyncService(core, retry, slog.Default())
 	offers := services.NewOfferDeliveryService(rdb, cm, time.Second)
-	rounds := services.NewDispatchRoundService(rdb, offers, core, slog.Default(), 2, 10*time.Millisecond)
+	rounds := services.NewDispatchRoundService(rdb, offers, core, slog.Default(), 2, 10*time.Millisecond, 9, h3)
 	accept := services.NewRideAcceptanceService(rdb, cm, offers, sync, rounds, time.Second, slog.Default())
 	router := ws.NewMessageRouter(presence, location, accept, slog.Default())
 

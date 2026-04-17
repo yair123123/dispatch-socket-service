@@ -17,3 +17,9 @@ func RideRoundDriversKey(rideID string, roundNumber int) string {
 func RoundResultSentKey(roundID string) string {
 	return fmt.Sprintf("dispatch:round:%s:result_sent", roundID)
 }
+func H3CellDriversKey(cellID string) string {
+	return fmt.Sprintf("h3:cell:%s:drivers", cellID)
+}
+func DriverH3CellKey(driverID string) string {
+	return fmt.Sprintf("driver:%s:h3_cell", driverID)
+}

@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"dispatch-socket-service/internal/geo"
 	"dispatch-socket-service/internal/models"
 	rediskeys "dispatch-socket-service/internal/redis"
 	"dispatch-socket-service/internal/services"
@@ -39,10 +40,11 @@ func buildAcceptance(t *testing.T) (*redis.Client, *services.RideAcceptanceServi
 	cm := ws.NewConnectionManager()
 	logger := slog.Default()
 	core := &fakeCoreClient{}
+	h3 := geo.NewH3Indexer()
 	retry := services.NewRetrySyncService(rdb, core, logger, 10*time.Millisecond, 2)
 	sync := services.NewCoreSyncService(core, retry, logger)
 	offers := services.NewOfferDeliveryService(rdb, cm, time.Second)
-	rounds := services.NewDispatchRoundService(rdb, offers, core, logger, 2, 10*time.Millisecond)
+	rounds := services.NewDispatchRoundService(rdb, offers, core, logger, 2, 10*time.Millisecond, 9, h3)
 	accept := services.NewRideAcceptanceService(rdb, cm, offers, sync, rounds, time.Second, logger)
 	return rdb, accept, offers, done
 }
@@ -75,10 +77,11 @@ func TestMultipleAcceptsProduceSingleWinnerCallback(t *testing.T) {
 	cm := ws.NewConnectionManager()
 	logger := slog.Default()
 	core := &fakeCoreClient{}
+	h3 := geo.NewH3Indexer()
 	retry := services.NewRetrySyncService(rdb, core, logger, 10*time.Millisecond, 2)
 	sync := services.NewCoreSyncService(core, retry, logger)
 	offers := services.NewOfferDeliveryService(rdb, cm, time.Second)
-	rounds := services.NewDispatchRoundService(rdb, offers, core, logger, 2, 10*time.Millisecond)
+	rounds := services.NewDispatchRoundService(rdb, offers, core, logger, 2, 10*time.Millisecond, 9, h3)
 	accept := services.NewRideAcceptanceService(rdb, cm, offers, sync, rounds, time.Second, logger)
 	_, err := offers.DeliverOfferBatch(context.Background(), models.SendOfferRequest{
 		RoundID: "ride_9_round_1", RideID: "9", RoundNumber: 1, ExpiresAt: time.Now().Add(time.Minute).UTC().Format(time.RFC3339),

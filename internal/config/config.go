@@ -26,6 +26,7 @@ type Config struct {
 	CoreSyncMaxRetries     int
 	CoreCallbackMaxRetries int
 	CoreCallbackBackoff    time.Duration
+	DriverH3Resolution     int
 }
 
 func Load() (Config, error) {
@@ -39,6 +40,7 @@ func Load() (Config, error) {
 		InternalServiceSecret:  envOrDefault("INTERNAL_SERVICE_SECRET", ""),
 		CoreSyncMaxRetries:     intEnvOrDefault("CORE_SYNC_MAX_RETRIES", 10),
 		CoreCallbackMaxRetries: intEnvOrDefault("CORE_CALLBACK_MAX_RETRIES", 3),
+		DriverH3Resolution:     intEnvOrDefault("DRIVER_H3_RESOLUTION", 9),
 		CoreServiceTimeout:     durationSeconds("CORE_SERVICE_TIMEOUT_SECONDS", 3),
 		CoreCallbackBackoff:    durationSeconds("CORE_CALLBACK_BACKOFF_SECONDS", 1),
 		WSPingInterval:         durationSeconds("WS_PING_INTERVAL_SECONDS", 10),
@@ -52,6 +54,9 @@ func Load() (Config, error) {
 
 	if cfg.JWTSecret == "" && cfg.JWTPublicKey == "" {
 		return Config{}, fmt.Errorf("either JWT_SECRET or JWT_PUBLIC_KEY must be set")
+	}
+	if cfg.DriverH3Resolution < 0 || cfg.DriverH3Resolution > 15 {
+		return Config{}, fmt.Errorf("DRIVER_H3_RESOLUTION must be between 0 and 15")
 	}
 	return cfg, nil
 }

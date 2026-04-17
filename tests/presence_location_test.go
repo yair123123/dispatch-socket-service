@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"dispatch-socket-service/internal/geo"
 	"dispatch-socket-service/internal/models"
 	rediskeys "dispatch-socket-service/internal/redis"
 	"dispatch-socket-service/internal/services"
@@ -23,7 +24,8 @@ func setupRedis(t *testing.T) (*redis.Client, func()) {
 func TestLocationUpdateWritesRedis(t *testing.T) {
 	rdb, done := setupRedis(t)
 	defer done()
-	svc := services.NewLocationService(rdb, time.Minute, time.Minute)
+	h3 := geo.NewH3Indexer()
+	svc := services.NewLocationService(rdb, time.Minute, time.Minute, 9, h3)
 	err := svc.UpdateLocation(context.Background(), "driver_1", models.LocationUpdateRequest{Lat: 1.1, Lon: 2.2, Accuracy: 3.3, Speed: 4.4, Heading: 5.5})
 	require.NoError(t, err)
 
@@ -31,6 +33,7 @@ func TestLocationUpdateWritesRedis(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "1.100000", state["lat"])
 	require.Equal(t, "2.200000", state["lon"])
+	require.NotEmpty(t, state["h3_cell"])
 }
 
 func TestAvailabilityUpdateWritesRedis(t *testing.T) {
